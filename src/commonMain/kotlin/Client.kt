@@ -93,12 +93,6 @@ abstract class BaseClient(
     // filter: Filter what types to include.
     // filterStrict: Posts MUST have only the types specified in filter.
     // TODO: javadoc
-    
-    @Serializable
-    class LikedBlogPostsResponse(
-        @SerialName("liked_posts") val posts: Set<Post>,
-        @SerialName("liked_count") val totalLiked: Int
-    )
 
     private suspend fun blogLikes(
         blog: String,
