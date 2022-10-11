@@ -85,7 +85,7 @@ abstract class BaseClient(
             else it.body<Response<AvatarResponseObject>>().response.avatar_url
         })
 
-    suspend fun blogInfo(blog: String) =
+    suspend fun blogInfo(blog: String) = // TODO optional stuff
         client.get { url { appendPathSegments(version, "blog", blog, "info") } }.body<Blog>()
 
     // * // * // * // * // * // * // * // * // * // * //
@@ -100,7 +100,7 @@ abstract class BaseClient(
         
     )
     
-    suspend fun blogPost()
+    //suspend fun blogPost()
 
     private suspend fun blogLikes(
         blog: String,
