@@ -93,6 +93,14 @@ abstract class BaseClient(
     // filter: Filter what types to include.
     // filterStrict: Posts MUST have only the types specified in filter.
     // TODO: javadoc
+    
+    suspend fun blogPosts(
+        blog: String,
+        vararg tags: String,
+        
+    )
+    
+    suspend fun blogPost()
 
     private suspend fun blogLikes(
         blog: String,
