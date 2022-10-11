@@ -17,6 +17,7 @@ class Post(
     val content: List<Content>
 )
 
+// TODO: find a better way to do this
 @Serializable(with = PostContentType.Serializer::class)
 enum class PostContentType {
     TEXT,
@@ -93,10 +94,10 @@ sealed class Content(
     ): Content(PostContentType.VIDEO), AudioVideoContent
 }
 
-sealed class BaseMedia {
-    abstract val url: String
-    abstract val width: Int?
-    abstract val height: Int?
+interface BaseMedia {
+    val url: String
+    val width: Int?
+    val height: Int?
 }
 
 @Serializable
