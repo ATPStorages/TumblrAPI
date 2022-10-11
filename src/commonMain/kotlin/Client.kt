@@ -100,8 +100,8 @@ abstract class BaseClient(
         offset: Int? = null,
         after: Long? = null,
         limit: Byte = 20,
-        filterStrict: Boolean = false,
-        vararg filters: PostContentType
+        vararg filters: PostContentType,
+        filterStrict: Boolean = false
     ) = this.client.get { url {
         appendPathSegments(version, "blog", blog, "likes")
         if(offset != null) parameters.append("offset", offset.toString())
@@ -123,24 +123,24 @@ abstract class BaseClient(
         blog: String,
         before: Long,
         limit: Byte = 20,
-        filterStrict: Boolean = false,
-        vararg filters: PostContentType
+        vararg filters: PostContentType,
+        filterStrict: Boolean = false
     ) = blogLikes(blog, before, null, null, limit, filterStrict, *filters)
 
     suspend fun blogLikesAfter(
         blog: String,
         after: Long,
         limit: Byte = 20,
-        filterStrict: Boolean = false,
-        vararg filters: PostContentType
+        vararg filters: PostContentType,
+        filterStrict: Boolean = false
     ) = blogLikes(blog, null, null, after, limit, filterStrict, *filters)
 
     suspend fun blogLikes(
         blog: String,
         limit: Byte = 20,
         offset: Int? = null,
-        filterStrict: Boolean = false,
-        vararg filters: PostContentType
+        vararg filters: PostContentType,
+        filterStrict: Boolean = false
     ) = blogLikes(blog, null, offset, null, limit, filterStrict, *filters)
 
     suspend fun readTag(
@@ -148,8 +148,8 @@ abstract class BaseClient(
         before: Long? = null,
         after: Long? = null,
         limit: Byte = 20,
-        filterStrict: Boolean = false,
-        vararg filters: PostContentType
+        vararg filters: PostContentType,
+        filterStrict: Boolean = false
     ) = this.client.get { url {
         appendPathSegments(version, "tagged")
         parameters.append("tag", tag)
