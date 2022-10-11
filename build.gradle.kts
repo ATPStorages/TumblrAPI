@@ -2,10 +2,11 @@ plugins {
     val kotlinVersion = "1.7.20"
     kotlin("multiplatform") version kotlinVersion
     kotlin("plugin.serialization") version kotlinVersion
-    id("maven-publish")
+    `maven-publish`
+    signing
 }
 
-group = "me.adenosine3phosphate.tumblr_api"
+group = "me.adenosine3phosphate"
 version = "1.0-SNAPSHOT"
 
 repositories {
@@ -13,11 +14,56 @@ repositories {
 }
 
 publishing {
-    repositories {
-        maven {
-            //...
+    publications {
+        create<MavenPublication>("mavenKotlin") {
+            groupId = project.group.toString()
+            artifactId = "tumblr-api"
+            version = project.version.toString()
+
+            pom {
+                name.set("Tumblr API")
+                description.set("A general purpose Tumblr API, with support for NPF (Neue Post Format,) as well as OAuth 1/2.")
+                inceptionYear.set("2022")
+
+                licenses {
+                    license {
+                        name.set("MIT License")
+                        url.set("https://opensource.org/licenses/MIT")
+                    }
+                }
+
+                issueManagement {
+                    system.set("GitHub Issues")
+                    url.set("https://github.com/ATPStorages/TumblrAPI/issues")
+                }
+
+                developers {
+                    developer {
+                        id.set("mikoe")
+                        name.set("Miko Elbrecht")
+                        email.set("pmt.mailservice@gmail.com")
+                    }
+                }
+
+                scm {
+                    connection.set("scm:git:git://github.com/ATPStorages/TumblrAPI.git")
+                    developerConnection.set("scm:git:ssh:git@github.com:ATPStorages/TumblrAPI.git")
+                    url.set("https://github.com/ATPStorages/TumblrAPI")
+                }
+            }
         }
     }
+
+    repositories {
+        maven {
+            name = "tumblr-api"
+            url = uri(layout.buildDirectory.dir("repo"))
+        }
+    }
+}
+
+signing {
+    sign(publishing.publications["mavenKotlin"])
 }
 
 kotlin {
@@ -37,7 +83,7 @@ kotlin {
     }
     val hostOs = System.getProperty("os.name")
     val isMingwX64 = hostOs.startsWith("Windows")
-    val nativeTarget = when {
+    when {
         hostOs == "Mac OS X" -> macosX64("native") { binaries.staticLib(); binaries.sharedLib() }
         hostOs == "Linux" -> linuxX64("native") { binaries.staticLib(); binaries.sharedLib() }
         isMingwX64 -> mingwX64("native") { binaries.staticLib(); binaries.sharedLib() }
@@ -51,7 +97,6 @@ kotlin {
             }
         }
     }
-
     
     sourceSets {
         val ktorVersion = "2.1.2"
@@ -72,19 +117,16 @@ kotlin {
             }
         }
         val jvmMain by getting {
-            dependsOn(commonMain)
             dependencies { implementation("io.ktor:ktor-client-apache:$ktorVersion") }
         }
         val jvmTest by getting
         val jsMain by getting {
-            dependsOn(commonMain)
             dependencies { implementation("io.ktor:ktor-client-js:$ktorVersion") }
         }
         val jsTest by getting {
             dependencies { implementation(kotlin("test-js")) }
         }
         val nativeMain by getting {
-            dependsOn(commonMain)
             dependencies { implementation("io.ktor:ktor-client-curl:$ktorVersion") }
         }
         val nativeTest by getting

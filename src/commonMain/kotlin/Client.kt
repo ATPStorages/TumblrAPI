@@ -18,38 +18,7 @@ val json = Json {
     ignoreUnknownKeys = true
 }
 
-val version = "v2"
-fun createClient(engine: HttpClientEngineFactory<HttpClientEngineConfig>, key: String? = null, oauthToken: String? = null) =
-    HttpClient(engine) {
-        install(ContentNegotiation) { json(json) }
-        install(HttpRequestRetry) {
-            retryIf(maxRetries = 5) { _, httpResponse ->
-                when(httpResponse.status.value) {
-                    429, 503, 500 -> true
-                    else -> false
-                }
-            }
-            exponentialDelay()
-        }
-
-        followRedirects = false
-
-        defaultRequest {
-            url {
-                protocol = URLProtocol.HTTPS
-                host = "api.tumblr.com"
-
-                parameters.append("npf", "true")
-                if(key != null) parameters.append("api_key", key)
-
-                headers {
-                    append(HttpHeaders.UserAgent, "KTAPI:atp 1.0.0")
-                    append(HttpHeaders.ContentType, ContentType.Application.Json)
-                    if(oauthToken != null) append(HttpHeaders.Authorization, "Bearer $oauthToken")
-                }
-            }
-        }
-    }
+const val version = "v2"
 // * // * // * // * // * // * // * // * // * // * //
 @Serializable
 class ResponseStatus(
@@ -115,6 +84,7 @@ abstract class BaseClient(
             if(it.headers[HttpHeaders.Location] != null) it.headers[HttpHeaders.Location]!!
             else it.body<Response<AvatarResponseObject>>().response.avatar_url
         })
+
     suspend fun blogInfo(blog: String) =
         client.get { url { appendPathSegments(version, "blog", blog, "info") } }.body<Blog>()
 
@@ -122,6 +92,85 @@ abstract class BaseClient(
 
     // filter: Filter what types to include.
     // filterStrict: Posts MUST have only the types specified in filter.
+
+    @Serializable
+    class LikedBlogPostsResponse(
+        @SerialName("liked_posts") val posts: Set<Post>,
+        @SerialName("liked_count") val totalLiked: Int
+    )
+
+    private suspend fun blogLikes(
+        blog: String,
+        before: Long? = null,
+        offset: Int? = null,
+        after: Long? = null,
+        limit: Byte = 20,
+        filter: Set<PostContentType>? = null,
+        filterStrict: Boolean = false
+    ) = this.client.get { url {
+        appendPathSegments(version, "blog", blog, "likes")
+        if(offset != null) parameters.append("offset", offset.toString())
+        if(before != null) parameters.append("before", before.toString())
+        if(after != null) parameters.append("after", after.toString())
+        parameters.append("limit", limit.toString())
+    } }.body<Response<LikedBlogPostsResponse>>().let { api ->
+        Response(
+            api.status,
+            LikedBlogPostsResponse(
+                api.response.posts.let { if(filter != null) it.filterContent(filter, filterStrict) else it },
+                api.response.totalLiked
+            ),
+            api.errors
+        )
+    }
+
+    suspend fun blogLikesBefore(
+        blog: String,
+        before: Long,
+        limit: Byte = 20,
+        filter: Set<PostContentType>? = null,
+        filterStrict: Boolean = false
+    ) = blogLikes(blog, before, null, null, limit, filter, filterStrict)
+
+    suspend fun blogLikesBefore(
+        blog: String,
+        before: Long,
+        limit: Byte = 20,
+        filter: PostContentType,
+        filterStrict: Boolean = false
+    ) = blogLikes(blog, before, null, null, limit, setOf(filter), filterStrict)
+
+    suspend fun blogLikesAfter(
+        blog: String,
+        after: Long,
+        limit: Byte = 20,
+        filter: Set<PostContentType>? = null,
+        filterStrict: Boolean = false
+    ) = blogLikes(blog, null, null, after, limit, filter, filterStrict)
+
+    suspend fun blogLikesAfter(
+        blog: String,
+        after: Long,
+        limit: Byte = 20,
+        filter: PostContentType,
+        filterStrict: Boolean = false
+    ) = blogLikes(blog, null, null, after, limit, setOf(filter), filterStrict)
+
+    suspend fun blogLikes(
+        blog: String,
+        limit: Byte = 20,
+        offset: Int? = null,
+        filter: Set<PostContentType>? = null,
+        filterStrict: Boolean = false
+    ) = blogLikes(blog, null, offset, null, limit, filter, filterStrict)
+
+    suspend fun blogLikes(
+        blog: String,
+        limit: Byte = 20,
+        offset: Int? = null,
+        filter: PostContentType,
+        filterStrict: Boolean = false
+    ) = blogLikes(blog, null, offset, null, limit, setOf(filter), filterStrict)
 
     suspend fun readTag(
         tag: String,
