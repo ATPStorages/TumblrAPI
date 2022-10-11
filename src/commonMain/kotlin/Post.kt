@@ -1,13 +1,8 @@
 package me.atpstorages.tumblr_api
 
-import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.descriptors.PrimitiveKind
-import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
-import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.encoding.Decoder
-import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.JsonNames
 import kotlinx.serialization.json.JsonElement
 
 @Serializable
@@ -17,19 +12,12 @@ class Post(
     val content: List<Content>
 )
 
-@Serializable(with = PostContentType.Serializer::class)
 enum class PostContentType {
-    TEXT,
-    LINK,
-    AUDIO,
-    VIDEO,
-    IMAGE;
-
-    object Serializer: KSerializer<PostContentType> {
-        override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("type", PrimitiveKind.STRING)
-        override fun deserialize(decoder: Decoder): PostContentType = PostContentType.valueOf(decoder.decodeString().uppercase())
-        override fun serialize(encoder: Encoder, value: PostContentType) = encoder.encodeString(value.name.lowercase())
-    }
+    @JsonNames("text") TEXT,
+    @JsonNames("link") LINK,
+    @JsonNames("audio") AUDIO,
+    @JsonNames("video") VIDEO,
+    @JsonNames("image") IMAGE;
 }
 
 @Serializable
@@ -93,10 +81,10 @@ sealed class Content(
     ): Content(PostContentType.VIDEO), AudioVideoContent
 }
 
-sealed class BaseMedia {
-    abstract val url: String
-    abstract val width: Int?
-    abstract val height: Int?
+interface BaseMedia {
+    val url: String
+    val width: Int?
+    val height: Int?
 }
 
 @Serializable
