@@ -100,8 +100,8 @@ abstract class BaseClient(
         offset: Int? = null,
         after: Long? = null,
         limit: Byte = 20,
-        filter: Set<PostContentType>? = null,
-        filterStrict: Boolean = false
+        filterStrict: Boolean = false,
+        vararg filters: PostContentType
     ) = this.client.get { url {
         appendPathSegments(version, "blog", blog, "likes")
         if(offset != null) parameters.append("offset", offset.toString())
@@ -112,7 +112,7 @@ abstract class BaseClient(
         Response(
             api.status,
             LikedBlogPostsResponse(
-                api.response.posts.let { if(filter != null) it.filterContent(filter, filterStrict) else it },
+                api.response.posts.let { if(filters.isNotEmpty()) it.filterContent(filterStrict, *filters) else it },
                 api.response.totalLiked
             ),
             api.errors
@@ -123,57 +123,33 @@ abstract class BaseClient(
         blog: String,
         before: Long,
         limit: Byte = 20,
-        filter: Set<PostContentType>? = null,
-        filterStrict: Boolean = false
-    ) = blogLikes(blog, before, null, null, limit, filter, filterStrict)
-
-    suspend fun blogLikesBefore(
-        blog: String,
-        before: Long,
-        limit: Byte = 20,
-        filter: PostContentType,
-        filterStrict: Boolean = false
-    ) = blogLikes(blog, before, null, null, limit, setOf(filter), filterStrict)
+        filterStrict: Boolean = false,
+        vararg filters: PostContentType
+    ) = blogLikes(blog, before, null, null, limit, filterStrict, *filters)
 
     suspend fun blogLikesAfter(
         blog: String,
         after: Long,
         limit: Byte = 20,
-        filter: Set<PostContentType>? = null,
-        filterStrict: Boolean = false
-    ) = blogLikes(blog, null, null, after, limit, filter, filterStrict)
-
-    suspend fun blogLikesAfter(
-        blog: String,
-        after: Long,
-        limit: Byte = 20,
-        filter: PostContentType,
-        filterStrict: Boolean = false
-    ) = blogLikes(blog, null, null, after, limit, setOf(filter), filterStrict)
+        filterStrict: Boolean = false,
+        vararg filters: PostContentType
+    ) = blogLikes(blog, null, null, after, limit, filterStrict, *filters)
 
     suspend fun blogLikes(
         blog: String,
         limit: Byte = 20,
         offset: Int? = null,
-        filter: Set<PostContentType>? = null,
-        filterStrict: Boolean = false
-    ) = blogLikes(blog, null, offset, null, limit, filter, filterStrict)
-
-    suspend fun blogLikes(
-        blog: String,
-        limit: Byte = 20,
-        offset: Int? = null,
-        filter: PostContentType,
-        filterStrict: Boolean = false
-    ) = blogLikes(blog, null, offset, null, limit, setOf(filter), filterStrict)
+        filterStrict: Boolean = false,
+        vararg filters: PostContentType
+    ) = blogLikes(blog, null, offset, null, limit, filterStrict, *filters)
 
     suspend fun readTag(
         tag: String,
         before: Long? = null,
         after: Long? = null,
         limit: Byte = 20,
-        filter: Set<PostContentType>? = null,
-        filterStrict: Boolean = false
+        filterStrict: Boolean = false,
+        vararg filters: PostContentType
     ) = this.client.get { url {
         appendPathSegments(version, "tagged")
         parameters.append("tag", tag)
@@ -183,20 +159,11 @@ abstract class BaseClient(
         Response(
             postSet.status,
             postSet.response
-                .let { if(filter != null) it.filterContent(filter, filterStrict) else it }
+                .let { if(filters.isNotEmpty()) it.filterContent(filterStrict, *filters) else it }
                 .let { if(after != null) it.filter { it.timestamp > after }.toSet() else it },
             postSet.errors
         )
     }
-
-    suspend fun readTag(
-        tag: String,
-        limit: Byte = 20,
-        filter: PostContentType,
-        before: Long? = null,
-        after: Long? = null,
-        filterStrict: Boolean = false
-    ) = readTag(tag, before, after, limit, setOf(filter), filterStrict)
 }
 
 // TODO: class OAuthClient(...) refer to ln 73
