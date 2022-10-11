@@ -1,9 +1,9 @@
 package me.atpstorages.tumblr_api
 
-fun Set<Post>.filterContent(vararg filters: PostContentType, strict: Boolean = false) = buildSet {
+fun Set<Post>.filterContent(strict: Boolean = false, vararg filters: PostContentType) = buildSet {
     this@filterContent
-        .filter { (strict && it.content.none { content -> !filter.contains(content.type) }) || !strict }
-        .forEach { add(it.filterContent(filter)) }
+        .filter { (strict && it.content.all { content -> filters.contains(content.type) }) || !strict }
+        .forEach { add(it.filterContent(*filters)) }
 }
 
 fun Post.filterContent(vararg types: PostContentType) = Post(
