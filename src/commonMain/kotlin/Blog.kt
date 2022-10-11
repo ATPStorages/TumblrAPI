@@ -17,5 +17,13 @@ enum class BlogAvatarSize(val px: Short) {
     SQUARE_512(512)
 }
 
+// blogAvatar
 @Serializable
 class AvatarResponseObject(val avatar_url: String)
+
+// blogLikes
+@Serializable
+class LikedBlogPostsResponse(
+    @SerialName("liked_posts") val posts: Set<Post>,
+    @SerialName("liked_count") val totalLiked: Int
+)
