@@ -2,7 +2,6 @@ package me.atpstorages.tumblr_api
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.JsonNames
 import kotlinx.serialization.json.JsonElement
 
 @Serializable
@@ -12,12 +11,13 @@ class Post(
     val content: List<Content>
 )
 
+@Serializable
 enum class PostContentType {
-    @JsonNames("text") TEXT,
-    @JsonNames("link") LINK,
-    @JsonNames("audio") AUDIO,
-    @JsonNames("video") VIDEO,
-    @JsonNames("image") IMAGE;
+    @SerialName("text") TEXT,
+    @SerialName("link") LINK,
+    @SerialName("audio") AUDIO,
+    @SerialName("video") VIDEO,
+    @SerialName("image") IMAGE;
 }
 
 @Serializable
