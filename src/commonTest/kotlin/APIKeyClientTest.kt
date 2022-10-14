@@ -9,7 +9,7 @@ import kotlin.test.assertIs
 @OptIn(ExperimentalCoroutinesApi::class)
 class ClientTest {
     private val clientNoKey = Client("")
-    private val clientWithKey = Client("")
+    private val clientWithKey = Client("7moY6pNd0p2HljMueT4xMNcY3nQ7GQtjVLqQmFPGNrE7iecxCa")
     val clientWithOAuth = Unit
 
     @Test
@@ -22,6 +22,6 @@ class ClientTest {
 
     @Test
     fun checkTagged() = runTest {
-        // TODO
+        println(clientWithKey.blogPosts("nightmargin").blog.totalPosts)
     }
 }
