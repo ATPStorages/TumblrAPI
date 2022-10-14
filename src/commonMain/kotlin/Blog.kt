@@ -1,9 +1,19 @@
 package me.atpstorages.tumblr_api
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-class Blog
+class Blog(
+    val title: String,
+    @SerialName("posts") val totalPosts: Int,
+)
+
+@Serializable
+class BlogPostsResponse(
+    val blog: Blog,
+    val posts: Set<Post>
+)
 
 enum class BlogAvatarSize(val px: Short) {
     SQUARE_16  (16),

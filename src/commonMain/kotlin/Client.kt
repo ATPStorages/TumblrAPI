@@ -15,6 +15,9 @@ import kotlinx.serialization.json.Json
 // * // * // * // * // * // * // * // * // * // * //
 val json = Json {
     ignoreUnknownKeys = true
+    prettyPrint = true
+
+    classDiscriminator = "ktapi_type"
 }
 
 const val version = "v2"
@@ -93,14 +96,62 @@ abstract class BaseClient(
     // filter: Filter what types to include.
     // filterStrict: Posts MUST have only the types specified in filter.
     // TODO: javadoc
-    
+
+    enum class PostTextReturnFilter {
+        RAW,
+        TEXT,
+        HTML;
+    }
+
     suspend fun blogPosts(
         blog: String,
-        vararg tags: String,
-        
-    )
+        limit: Byte = 20,
+        before: Long? = null,
+        after: Long? = null,
+        offset: Int = 0,
+        textFilter: PostTextReturnFilter = PostTextReturnFilter.HTML,
+        tags: Set<String>? = null,
+        vararg filters: PostContentType,
+        filterStrict: Boolean = false
+    )  = this.client.get { url {
+        tags?.let {}
+        appendPathSegments(version, "blog", blog, "posts")
+        if(textFilter != PostTextReturnFilter.HTML) parameters.append("filter", textFilter.name.lowercase())
+        if(before != null) parameters.append("before", before.toString())
+
+        parameters.append("offset", offset.toString())
+        parameters.append("limit", limit.toString())
+    } }.body<Response<BlogPostsResponse>>().response.let { blogResponse ->
+        BlogPostsResponse(
+            blogResponse.blog,
+            blogResponse.posts
+
+                .let { if(filters.isNotEmpty()) it.filterContent(filterStrict, *filters) else it }
+                .let { if(after != null) it.filter { post -> post.timestamp > after }.toSet() else it }
+        )
+    }
+
+    suspend fun blogPosts(
+        blog: String,
+        limit: Byte = 20,
+        before: Long? = null,
+        after: Long? = null,
+        offset: Int = 0,
+        textFilter: PostTextReturnFilter = PostTextReturnFilter.HTML,
+        tag: String,
+        vararg filters: PostContentType,
+        filterStrict: Boolean = false
+    ) = blogPosts(blog, limit, before, after, offset, textFilter, setOf(tag), *filters, filterStrict = filterStrict)
     
-    //suspend fun blogPost()
+    suspend fun blogPost(
+        blog: String,
+        id: Long,
+        textFilter: PostTextReturnFilter = PostTextReturnFilter.HTML
+    ) = this.client.get { url {
+        appendPathSegments(version, "blog", blog, "posts")
+        if(textFilter != PostTextReturnFilter.HTML) parameters.append("filter", textFilter.name.lowercase())
+        parameters.append("id", id.toString())
+    } }.body<Response<Set<Post>>>().response.first()
 
     private suspend fun blogLikes(
         blog: String,
@@ -133,7 +184,7 @@ abstract class BaseClient(
         limit: Byte = 20,
         vararg filters: PostContentType,
         filterStrict: Boolean = false
-    ) = blogLikes(blog, before, null, null, limit, filterStrict, *filters)
+    ) = blogLikes(blog, before, null, null, limit, *filters, filterStrict = filterStrict)
 
     suspend fun blogLikesAfter(
         blog: String,
@@ -141,7 +192,7 @@ abstract class BaseClient(
         limit: Byte = 20,
         vararg filters: PostContentType,
         filterStrict: Boolean = false
-    ) = blogLikes(blog, null, null, after, limit, filterStrict, *filters)
+    ) = blogLikes(blog, null, null, after, limit, *filters, filterStrict = filterStrict)
 
     suspend fun blogLikes(
         blog: String,
@@ -149,7 +200,7 @@ abstract class BaseClient(
         offset: Int? = null,
         vararg filters: PostContentType,
         filterStrict: Boolean = false
-    ) = blogLikes(blog, null, offset, null, limit, filterStrict, *filters)
+    ) = blogLikes(blog, null, offset, null, limit, *filters, filterStrict = filterStrict)
 
     suspend fun readTag(
         tag: String,
@@ -163,13 +214,13 @@ abstract class BaseClient(
         parameters.append("tag", tag)
         parameters.append("limit", limit.toString())
         if(before != null) parameters.append("before", before.toString())
-    } }.body<Response<Set<Post>>>().let { postSet ->
+    } }.body<Response<Set<Post>>>().let { api ->
         Response(
-            postSet.status,
-            postSet.response
+            api.status,
+            api.response
                 .let { if(filters.isNotEmpty()) it.filterContent(filterStrict, *filters) else it }
-                .let { if(after != null) it.filter { it.timestamp > after }.toSet() else it },
-            postSet.errors
+                .let { if(after != null) it.filter { post -> post.timestamp > after }.toSet() else it },
+            api.errors
         )
     }
 }

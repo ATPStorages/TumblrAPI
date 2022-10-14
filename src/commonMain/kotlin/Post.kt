@@ -1,9 +1,10 @@
 package me.atpstorages.tumblr_api
 
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.JsonNames
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNames
 
 @Serializable
 class Post(
@@ -12,6 +13,8 @@ class Post(
     val content: List<Content>
 )
 
+@Serializable
+@OptIn(ExperimentalSerializationApi::class)
 enum class PostContentType {
     @JsonNames("text") TEXT,
     @JsonNames("link") LINK,
@@ -92,7 +95,7 @@ class EmbedIFrame(
     override val url: String,
     override val width: Int? = null,
     override val height: Int? = null
-): BaseMedia()
+): BaseMedia
 
 @Serializable
 class Media(
@@ -103,7 +106,7 @@ class Media(
     val cropped: Boolean? = null,
     @SerialName("has_original_dimensions") val originalSize: Boolean? = null,
     @SerialName("original_dimensions_missing") val dimensionsDefault: Boolean? = null
-): BaseMedia()
+): BaseMedia
 
 interface AudioVideoContent {
     val media: Media?
