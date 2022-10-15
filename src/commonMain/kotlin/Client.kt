@@ -16,8 +16,6 @@ import kotlinx.serialization.json.Json
 val json = Json {
     ignoreUnknownKeys = true
     prettyPrint = true
-
-    classDiscriminator = "ktapi_type"
 }
 
 const val version = "v2"
@@ -40,7 +38,9 @@ class Response<T>(
     @SerialName("meta") val status: ResponseStatus,
     val response: T,
     val errors: Set<ResponseError>? = null
-)
+) {
+    fun <R> fromResponse(newResponse: R) = Response(this.status, newResponse, this.errors)
+}
 // * // * // * // * // * // * // * // * // * // * //
 abstract class BaseClient(
     engine: HttpClientEngineFactory<HttpClientEngineConfig>,
@@ -121,14 +121,14 @@ abstract class BaseClient(
 
         parameters.append("offset", offset.toString())
         parameters.append("limit", limit.toString())
-    } }.body<Response<BlogPostsResponse>>().response.let { blogResponse ->
-        BlogPostsResponse(
-            blogResponse.blog,
-            blogResponse.posts
-
+    } }.body<Response<BlogPostsResponse>>().let { api ->
+        api.fromResponse(BlogPostsResponse(
+            api.response.blog,
+            api.response.posts
                 .let { if(filters.isNotEmpty()) it.filterContent(filterStrict, *filters) else it }
-                .let { if(after != null) it.filter { post -> post.timestamp > after }.toSet() else it }
-        )
+                .let { if(after != null) it.filter { post -> post.timestamp > after }.toSet() else it },
+            api.response.totalPosts
+        ))
     }
 
     suspend fun blogPosts(
@@ -168,14 +168,10 @@ abstract class BaseClient(
         if(after != null) parameters.append("after", after.toString())
         parameters.append("limit", limit.toString())
     } }.body<Response<LikedBlogPostsResponse>>().let { api ->
-        Response(
-            api.status,
-            LikedBlogPostsResponse(
-                api.response.posts.let { if(filters.isNotEmpty()) it.filterContent(filterStrict, *filters) else it },
-                api.response.totalLiked
-            ),
-            api.errors
-        )
+        api.fromResponse(LikedBlogPostsResponse(
+            api.response.posts.let { if(filters.isNotEmpty()) it.filterContent(filterStrict, *filters) else it },
+            api.response.totalLiked
+        ))
     }
 
     suspend fun blogLikesBefore(
@@ -214,14 +210,10 @@ abstract class BaseClient(
         parameters.append("tag", tag)
         parameters.append("limit", limit.toString())
         if(before != null) parameters.append("before", before.toString())
-    } }.body<Response<Set<Post>>>().let { api ->
-        Response(
-            api.status,
-            api.response
-                .let { if(filters.isNotEmpty()) it.filterContent(filterStrict, *filters) else it }
-                .let { if(after != null) it.filter { post -> post.timestamp > after }.toSet() else it },
-            api.errors
-        )
+    } }.body<Response<Set<Post>>>().also(::println).let { api ->
+        api.fromResponse(api.response
+            .let { if(filters.isNotEmpty()) it.filterContent(filterStrict, *filters) else it }
+            .let { if(after != null) it.filter { post -> post.timestamp > after }.toSet() else it })
     }
 }
 

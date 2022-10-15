@@ -10,7 +10,23 @@ import kotlinx.serialization.json.JsonNames
 class Post(
     val id: Long,
     val timestamp: Long,
-    val content: List<Content>
+    val content: List<Content>? = null,
+    val tags: List<String>? = null,
+    val blog: Blog? = null,
+    val slug: String? = null,
+    val summary: String? = null,
+    @SerialName("should_open_in_legacy") val shouldOpenInLegacy: Boolean? = null,
+    // layout, trail, interactability_reblog
+    @SerialName("can_like") val canLike: Boolean? = null,
+    @SerialName("can_reblog") val canReblog: Boolean? = null,
+    @SerialName("can_send_in_message") val canSendInMessage: Boolean? = null,
+    @SerialName("can_reply") val canReply: Boolean? = null,
+    @SerialName("display_avatar") val displayAvatar: Boolean? = null,
+    @SerialName("reblog_key") val reblogKey: String,
+    @SerialName("short_url") val shortUrl: String? = null,
+    @SerialName("genesis_post_id") val genesisId: String? = null,
+    @SerialName("blog_name") val blogName: String? = null,
+    @SerialName("post_url") val url: String
 )
 
 @Serializable
@@ -36,14 +52,19 @@ sealed class Content(
     @Serializable
     @SerialName("image")
     class Image(
-        val media: List<Media>
+        val media: List<Media>,
+        val colors: Map<String, String>? = null,
+        @SerialName("feedback_token") val feedbackToken: String? = null,
+        val poster: List<Media>? = null,
+        val attribution: Attribution? = null,
+        @SerialName("alt_text") val alternativeText: String? = null,
+        val caption: String? = null
     ): Content(PostContentType.IMAGE)
 
     @Serializable
     @SerialName("link")
     class Link(
         val url: String,
-
         val title: String? = null,
         val description: String? = null,
         val author: String? = null,
@@ -65,7 +86,7 @@ sealed class Content(
         @SerialName("embed_html") val embedHtml: String? = null,
         @SerialName("embed_url") val embedUrl: String? = null,
         override val metadata: JsonElement? = null,
-        //override val attribution: Content? = null
+        val attribution: Attribution? = null
     ): Content(PostContentType.AUDIO), AudioVideoContent
 
     @Serializable
@@ -80,8 +101,10 @@ sealed class Content(
         @SerialName("embed_url") val embedUrl: String? = null,
         override val metadata: JsonElement? = null,
         @SerialName("can_autoplay_on_cellular") val autoplayOnCellular: Boolean? = null,
-        //override val attribution: Content? = null
+        val attribution: Attribution? = null
     ): Content(PostContentType.VIDEO), AudioVideoContent
+
+    // TODO: Paywall
 }
 
 interface BaseMedia {
@@ -108,6 +131,8 @@ class Media(
     @SerialName("original_dimensions_missing") val dimensionsDefault: Boolean? = null
 ): BaseMedia
 
+
+
 interface AudioVideoContent {
     val media: Media?
     val url: String?
@@ -115,4 +140,47 @@ interface AudioVideoContent {
     val poster: List<Media>?
     val metadata: JsonElement?
     //val attribution: Content?
+}
+
+@Serializable
+@OptIn(ExperimentalSerializationApi::class)
+enum class ContentAttributionType {
+    @JsonNames("link") LINK,
+    @JsonNames("blog") BLOG,
+    @JsonNames("post") POST,
+    @JsonNames("app") APP;
+}
+
+@Serializable
+sealed class Attribution(
+    val type: ContentAttributionType
+) {
+    @Serializable
+    @SerialName("post")
+    class Post(
+        val url: String,
+        val post: me.atpstorages.tumblr_api.Post,
+        val blog: Blog
+    ): Attribution(ContentAttributionType.POST)
+
+    @Serializable
+    @SerialName("link")
+    class Link(
+        val url: String
+    ): Attribution(ContentAttributionType.LINK)
+
+    @Serializable
+    @SerialName("blog")
+    class Blog(
+        val blog: me.atpstorages.tumblr_api.Blog
+    ): Attribution(ContentAttributionType.BLOG)
+
+    @Serializable
+    @SerialName("app")
+    class App(
+        val url: String,
+        @SerialName("app_name") val appName: String? = null,
+        @SerialName("display_text") val displayText: String? = null,
+        val logo: Media? = null
+    ): Attribution(ContentAttributionType.APP)
 }
