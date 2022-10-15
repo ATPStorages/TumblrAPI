@@ -22,6 +22,6 @@ class ClientTest {
 
     @Test
     fun checkTagged() = runTest {
-        println(clientWithKey.blogPosts("nightmargin").blog.totalPosts)
+
     }
 }
