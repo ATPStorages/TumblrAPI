@@ -73,11 +73,114 @@ enum class BlogAvatarSize(val px: Short) {
 
 // blogAvatar
 @Serializable
-class AvatarResponseObject(val avatar_url: String)
+class BlogAvatarResponseObject(val avatar_url: String)
 
 // blogLikes
 @Serializable
-class LikedBlogPostsResponse(
+class LikedBlogPosts(
     @SerialName("liked_posts") val posts: Set<Post>,
-    @SerialName("liked_count") val totalLiked: Int
+    @SerialName("liked_count") val totalLiked: Int,
 )
+
+interface BlogPostNotesResponse {
+    val notes: List<PostNote>
+}
+
+@Serializable
+@OptIn(ExperimentalSerializationApi::class)
+enum class PostLikeType {
+    @JsonNames("like")
+    LIKE,
+
+    @JsonNames("reply")
+    REPLY,
+
+    @JsonNames("posted")
+    POSTED,
+
+    @JsonNames("reblog")
+    REBLOG,
+}
+
+@Serializable
+class BlogPostNotesResponseWithTags(
+    override val notes: List<PostNote>,
+) : BlogPostNotesResponse
+
+@Serializable
+class BlogPostNotesResponseNormal(
+    override val notes: List<PostNote>,
+    @SerialName("total_notes") val totalNotes: Int,
+) : BlogPostNotesResponse
+
+@Serializable
+class BlogPostNotesResponseConversation(
+    override val notes: List<PostNote>,
+    @SerialName("total_notes") val totalNotes: Int,
+    @SerialName("total_likes") val totalLikes: Int,
+    @SerialName("total_reblogs") val totalReblogs: Int,
+    @SerialName("rollup_notes") val rollupNotes: List<PostNote>,
+) : BlogPostNotesResponse
+
+interface BasePostNote {
+    val timestamp: Long
+    val blogName: String
+    val blogUUID: String
+    val blogUrl: String
+    val followed: Boolean
+    val avatarShape: BlogAvatarShape
+}
+
+@Serializable
+sealed class PostNote(val type: PostLikeType) {
+    @Serializable
+    @SerialName("like")
+    class Like(
+        override val timestamp: Long,
+        @SerialName("blog_name") override val blogName: String,
+        @SerialName("blog_uuid") override val blogUUID: String,
+        @SerialName("blog_url") override val blogUrl: String,
+        override val followed: Boolean,
+        @SerialName("avatar_shape") override val avatarShape: BlogAvatarShape,
+    ) : PostNote(PostLikeType.LIKE), BasePostNote
+
+    @Serializable
+    @SerialName("reply")
+    class Reply(
+        override val timestamp: Long,
+        @SerialName("blog_name") override val blogName: String,
+        @SerialName("blog_uuid") override val blogUUID: String,
+        @SerialName("blog_url") override val blogUrl: String,
+        override val followed: Boolean,
+        @SerialName("avatar_shape") override val avatarShape: BlogAvatarShape,
+        @SerialName("reply_text") val replyText: String,
+        // val formatting: List<>
+        @SerialName("is_original_poster") val isOriginalPoster: Boolean,
+        @SerialName("can_block") val canBlock: Boolean,
+    ) : PostNote(PostLikeType.REPLY), BasePostNote
+
+    @Serializable
+    @SerialName("posted")
+    class Posted(
+        override val timestamp: Long,
+        @SerialName("blog_name") override val blogName: String,
+        @SerialName("blog_uuid") override val blogUUID: String,
+        @SerialName("blog_url") override val blogUrl: String,
+        override val followed: Boolean,
+        @SerialName("avatar_shape") override val avatarShape: BlogAvatarShape,
+    ) : PostNote(PostLikeType.POSTED), BasePostNote
+
+    @Serializable
+    @SerialName("reblog")
+    class Reblog(
+        override val timestamp: Long,
+        @SerialName("blog_name") override val blogName: String,
+        @SerialName("blog_uuid") override val blogUUID: String,
+        @SerialName("blog_url") override val blogUrl: String,
+        override val followed: Boolean,
+        @SerialName("avatar_shape") override val avatarShape: BlogAvatarShape,
+        val tags: List<String>? = null,
+        @SerialName("post_id") val postID: Long,
+        @SerialName("reblog_parent_blog_name") val reblogParentBlogName: String,
+    ) : PostNote(PostLikeType.REBLOG), BasePostNote
+}

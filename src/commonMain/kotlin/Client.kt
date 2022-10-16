@@ -36,8 +36,8 @@ class ResponseError(
 @Serializable
 class Response<T>(
     @SerialName("meta") val status: ResponseStatus,
-    val response: T,
-    val errors: Set<ResponseError>? = null
+    @SerialName("response") val contents: T,
+    private val errors: Set<ResponseError>? = null,
 ) {
     fun <R> fromResponse(newResponse: R) = Response(this.status, newResponse, this.errors)
 }
@@ -84,12 +84,43 @@ abstract class BaseClient(
 
     suspend fun blogAvatar(blog: String, size: BlogAvatarSize = BlogAvatarSize.SQUARE_512) =
         Url(client.get { url { appendPathSegments(version, "blog", blog, "avatar", size.px.toString()) } }.let {
-            if(it.headers[HttpHeaders.Location] != null) it.headers[HttpHeaders.Location]!!
-            else it.body<Response<AvatarResponseObject>>().response.avatar_url
+            if (it.headers[HttpHeaders.Location] != null) it.headers[HttpHeaders.Location]!!
+            else it.body<Response<BlogAvatarResponseObject>>().contents.avatar_url
         })
 
     suspend fun blogInfo(blog: String) = // TODO optional stuff
         client.get { url { appendPathSegments(version, "blog", blog, "info") } }.body<Blog>()
+
+    enum class PostNotesMode {
+        ALL,
+        LIKES,
+        CONVERSATION,
+        ROLLUP,
+        REBLOGS_WITH_TAGS;
+    }
+
+    suspend fun blogPostNotes(
+        blog: String,
+        id: Long,
+        before: Long? = null,
+        mode: PostNotesMode = PostNotesMode.ALL,
+    ): BlogPostNotesResponse {
+        val api = this.client.get {
+            url {
+                appendPathSegments(version, "blog", blog, "notes")
+                if (before != null) parameters.append("before_timestamp", before.toString())
+
+                parameters.append("mode", mode.name.lowercase())
+                parameters.append("id", id.toString())
+            }
+        }
+
+        return when (mode) {
+            PostNotesMode.CONVERSATION -> api.body<Response<BlogPostNotesResponseConversation>>()
+            PostNotesMode.REBLOGS_WITH_TAGS -> api.body<Response<BlogPostNotesResponseWithTags>>()
+            else -> api.body<Response<BlogPostNotesResponseNormal>>()
+        }.contents
+    }
 
     // * // * // * // * // * // * // * // * // * // * //
 
@@ -112,24 +143,20 @@ abstract class BaseClient(
         textFilter: PostTextReturnFilter = PostTextReturnFilter.HTML,
         tags: Set<String>? = null,
         vararg filters: PostContentType,
-        filterStrict: Boolean = false
-    )  = this.client.get { url {
-        tags?.let {}
-        appendPathSegments(version, "blog", blog, "posts")
-        if(textFilter != PostTextReturnFilter.HTML) parameters.append("filter", textFilter.name.lowercase())
-        if(before != null) parameters.append("before", before.toString())
+        filterStrict: Boolean = false,
+    ) = this.client.get {
+        url {
+            appendPathSegments(version, "blog", blog, "posts")
+            if (textFilter != PostTextReturnFilter.HTML) parameters.append("filter", textFilter.name.lowercase())
+            if (before != null) parameters.append("before", before.toString())
 
-        parameters.append("offset", offset.toString())
-        parameters.append("limit", limit.toString())
-    } }.body<Response<BlogPostsResponse>>().let { api ->
-        api.fromResponse(BlogPostsResponse(
-            api.response.blog,
-            api.response.posts
-                .let { if(filters.isNotEmpty()) it.filterContent(filterStrict, *filters) else it }
-                .let { if(after != null) it.filter { post -> post.timestamp > after }.toSet() else it },
-            api.response.totalPosts
-        ))
-    }
+            parameters.append("offset", offset.toString())
+            parameters.append("limit", limit.toString())
+            tags?.forEachIndexed { idx, tag -> parameters.append("tag[$idx]", tag) }
+        }
+    }.body<Response<BlogPostsResponse>>().contents.posts
+        .let { if (filters.isNotEmpty()) it.filterContent(filterStrict, *filters) else it }
+        .let { if (after != null) it.filter { post -> post.timestamp > after }.toSet() else it }
 
     suspend fun blogPosts(
         blog: String,
@@ -142,16 +169,18 @@ abstract class BaseClient(
         vararg filters: PostContentType,
         filterStrict: Boolean = false
     ) = blogPosts(blog, limit, before, after, offset, textFilter, setOf(tag), *filters, filterStrict = filterStrict)
-    
+
     suspend fun blogPost(
         blog: String,
         id: Long,
-        textFilter: PostTextReturnFilter = PostTextReturnFilter.HTML
-    ) = this.client.get { url {
-        appendPathSegments(version, "blog", blog, "posts")
-        if(textFilter != PostTextReturnFilter.HTML) parameters.append("filter", textFilter.name.lowercase())
-        parameters.append("id", id.toString())
-    } }.body<Response<Set<Post>>>().response.first()
+        textFilter: PostTextReturnFilter = PostTextReturnFilter.HTML,
+    ) = this.client.get {
+        url {
+            appendPathSegments(version, "blog", blog, "posts")
+            if (textFilter != PostTextReturnFilter.HTML) parameters.append("filter", textFilter.name.lowercase())
+            parameters.append("id", id.toString())
+        }
+    }.body<Response<Set<Post>>>().contents.first()
 
     private suspend fun blogLikes(
         blog: String,
@@ -160,18 +189,20 @@ abstract class BaseClient(
         after: Long? = null,
         limit: Byte = 20,
         vararg filters: PostContentType,
-        filterStrict: Boolean = false
-    ) = this.client.get { url {
-        appendPathSegments(version, "blog", blog, "likes")
-        if(offset != null) parameters.append("offset", offset.toString())
-        if(before != null) parameters.append("before", before.toString())
-        if(after != null) parameters.append("after", after.toString())
-        parameters.append("limit", limit.toString())
-    } }.body<Response<LikedBlogPostsResponse>>().let { api ->
-        api.fromResponse(LikedBlogPostsResponse(
-            api.response.posts.let { if(filters.isNotEmpty()) it.filterContent(filterStrict, *filters) else it },
-            api.response.totalLiked
-        ))
+        filterStrict: Boolean = false,
+    ) = this.client.get {
+        url {
+            appendPathSegments(version, "blog", blog, "likes")
+            if (offset != null) parameters.append("offset", offset.toString())
+            if (before != null) parameters.append("before", before.toString())
+            if (after != null) parameters.append("after", after.toString())
+            parameters.append("limit", limit.toString())
+        }
+    }.body<Response<LikedBlogPosts>>().let { response ->
+        LikedBlogPosts(
+            response.contents.posts.let { if (filters.isNotEmpty()) it.filterContent(filterStrict, *filters) else it },
+            response.contents.totalLiked
+        )
     }
 
     suspend fun blogLikesBefore(
@@ -204,19 +235,20 @@ abstract class BaseClient(
         after: Long? = null,
         limit: Byte = 20,
         vararg filters: PostContentType,
-        filterStrict: Boolean = false
-    ) = this.client.get { url {
-        appendPathSegments(version, "tagged")
-        parameters.append("tag", tag)
-        parameters.append("limit", limit.toString())
-        if(before != null) parameters.append("before", before.toString())
-    } }.body<Response<Set<Post>>>().also(::println).let { api ->
-        api.fromResponse(api.response
-            .let { if(filters.isNotEmpty()) it.filterContent(filterStrict, *filters) else it }
-            .let { if(after != null) it.filter { post -> post.timestamp > after }.toSet() else it })
-    }
+        filterStrict: Boolean = false,
+    ) = this.client.get {
+        url {
+            appendPathSegments(version, "tagged")
+            parameters.append("tag", tag)
+            parameters.append("limit", limit.toString())
+            if (before != null) parameters.append("before", before.toString())
+        }
+    }.body<Response<Set<Post>>>().contents
+        .let { if (filters.isNotEmpty()) it.filterContent(filterStrict, *filters) else it }
+        .let { if (after != null) it.filter { post -> post.timestamp > after }.toSet() else it }
 }
 
 // TODO: class OAuthClient(...) refer to ln 73
+// TODO: handle api errors (probably through a protected function)
 
 expect class Client(consumerKey: String): BaseClient
