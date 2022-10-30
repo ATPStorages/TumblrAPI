@@ -8,8 +8,8 @@ import kotlinx.serialization.json.JsonNames
 @Serializable
 class Blog(
     val uuid: String,
-    val name: String? = null,
-    val url: String? = null,
+    val name: String,
+    val url: String,
     val title: String? = null,
     val description: String? = null,
     @SerialName("followed") val following: Boolean? = null,
@@ -20,7 +20,7 @@ class Blog(
     @SerialName("posts") val totalPosts: Int? = null,
     @SerialName("likes") val totalLikes: Int? = null,
     val avatar: List<Media>? = null,
-    val theme: BlogTheme? = null
+    val theme: BlogTheme? = null,
 )
 
 @Serializable
@@ -53,10 +53,10 @@ class BlogTheme(
 )
 
 @Serializable
-class BlogPostsResponse(
+class BlogPosts(
     val blog: Blog,
     val posts: Set<Post>,
-    @SerialName("total_posts") val totalPosts: Int
+    @SerialName("total_posts") val totalPosts: Int,
 )
 
 enum class BlogAvatarSize(val px: Short) {
@@ -73,7 +73,7 @@ enum class BlogAvatarSize(val px: Short) {
 
 // blogAvatar
 @Serializable
-class BlogAvatarResponseObject(val avatar_url: String)
+class BlogAvatarObject(val avatar_url: String)
 
 // blogLikes
 @Serializable
@@ -82,7 +82,7 @@ class LikedBlogPosts(
     @SerialName("liked_count") val totalLiked: Int,
 )
 
-interface BlogPostNotesResponse {
+interface BlogPostNotes {
     val notes: List<PostNote>
 }
 
@@ -103,24 +103,24 @@ enum class PostLikeType {
 }
 
 @Serializable
-class BlogPostNotesResponseWithTags(
+class BlogPostNotesWithTags(
     override val notes: List<PostNote>,
-) : BlogPostNotesResponse
+) : BlogPostNotes
 
 @Serializable
-class BlogPostNotesResponseNormal(
+class BlogPostNotesNormal(
     override val notes: List<PostNote>,
     @SerialName("total_notes") val totalNotes: Int,
-) : BlogPostNotesResponse
+) : BlogPostNotes
 
 @Serializable
-class BlogPostNotesResponseConversation(
+class BlogPostNotesConversation(
     override val notes: List<PostNote>,
     @SerialName("total_notes") val totalNotes: Int,
     @SerialName("total_likes") val totalLikes: Int,
     @SerialName("total_reblogs") val totalReblogs: Int,
     @SerialName("rollup_notes") val rollupNotes: List<PostNote>,
-) : BlogPostNotesResponse
+) : BlogPostNotes
 
 interface BasePostNote {
     val timestamp: Long

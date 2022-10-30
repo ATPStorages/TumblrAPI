@@ -10,7 +10,7 @@ import kotlin.test.assertIs
 class ClientTests {
     private val clientNoKey = Client("")
     private val clientWithKey = Client("")
-    val clientWithOAuth = Unit
+    private val clientWithOAuth = OAuthClient("", "", "")
 
     @Test
     fun checkBlogAvatar() = runTest {
@@ -28,6 +28,10 @@ class ClientTests {
 
     @Test
     fun checkTagged() = runTest {
-
+        clientWithKey.blogPosts("atpcomm", limit = 1).also(::println)
+        clientWithOAuth.blogDraftPosts("atpcomm").also(::println)
+        clientWithOAuth.blogShuffleQueuedPosts("atpcomm").also(::println)
+        //clientWithOAuth.blogReorderQueuedPost("atpcomm")
+        clientWithOAuth.blogQueuedPosts("atpcomm").also(::println)
     }
 }

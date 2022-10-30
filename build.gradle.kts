@@ -93,25 +93,30 @@ kotlin {
     targets.all {
         compilations.all {
             kotlinOptions {
-                allWarningsAsErrors = true
+                //allWarningsAsErrors = true
             }
         }
     }
     
     sourceSets {
         val ktorVersion = "2.1.2"
+        val coroutineVersion = "1.6.4"
 
         val commonMain by getting {
             dependencies {
                 implementation("io.ktor:ktor-client-core:$ktorVersion")
                 implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
                 implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutineVersion")
+
+                implementation("com.javiersc.kotlinx:coroutines-run-blocking-all:0.1.0-rc.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.4.0")
             }
         }
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.6.4")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:$coroutineVersion")
             }
         }
         val jvmMain by getting {
