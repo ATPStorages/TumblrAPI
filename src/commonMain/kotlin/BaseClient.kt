@@ -38,21 +38,19 @@ class Response<T>(
     @SerialName("meta") val status: ResponseStatus,
     @SerialName("response") val contents: T,
     private val errors: Set<ResponseError>? = null,
-) {
-    fun <R> fromResponse(newResponse: R) = Response(this.status, newResponse, this.errors)
-}
+)
+
 // * // * // * // * // * // * // * // * // * // * //
-abstract class BaseClient(
+abstract class BaseClient internal constructor(
     engine: HttpClientEngineFactory<HttpClientEngineConfig>,
     consumerKey: String,
-    //secretKey: String? = null,
-    oauthToken: String? = null
 ) {
-    private val client = HttpClient(engine) {
+    protected var oauth: CodeGrantWithTimestamp? = null
+    protected val client = HttpClient(engine) {
         install(ContentNegotiation) { json(json) }
         install(HttpRequestRetry) {
             retryIf(maxRetries = 5) { _, httpResponse ->
-                when(httpResponse.status.value) {
+                when (httpResponse.status.value) {
                     429, 503, 500 -> true
                     else -> false
                 }
@@ -73,8 +71,7 @@ abstract class BaseClient(
                 headers {
                     append(HttpHeaders.UserAgent, "KTAPI:atp 1.0.0")
                     append(HttpHeaders.ContentType, ContentType.Application.Json)
-                    // should we have an oauth client that inherits from base or have a standalone that does the job?
-                    if(oauthToken != null) append(HttpHeaders.Authorization, "Bearer $oauthToken")
+                    oauth.let { if (it != null) append(HttpHeaders.Authorization, "Bearer ${it.accessToken}") }
                 }
             }
         }
@@ -85,11 +82,15 @@ abstract class BaseClient(
     suspend fun blogAvatar(blog: String, size: BlogAvatarSize = BlogAvatarSize.SQUARE_512) =
         Url(client.get { url { appendPathSegments(version, "blog", blog, "avatar", size.px.toString()) } }.let {
             if (it.headers[HttpHeaders.Location] != null) it.headers[HttpHeaders.Location]!!
-            else it.body<Response<BlogAvatarResponseObject>>().contents.avatar_url
+            else it.body<Response<BlogAvatarObject>>().contents.avatar_url
         })
+
+    suspend fun blogAvatar(blog: Blog, size: BlogAvatarSize = BlogAvatarSize.SQUARE_512) = blogAvatar(blog.name, size)
 
     suspend fun blogInfo(blog: String) = // TODO optional stuff
         client.get { url { appendPathSegments(version, "blog", blog, "info") } }.body<Blog>()
+
+    suspend fun blogInfo(blog: Blog) = blogInfo(blog.name)
 
     enum class PostNotesMode {
         ALL,
@@ -104,7 +105,7 @@ abstract class BaseClient(
         id: Long,
         before: Long? = null,
         mode: PostNotesMode = PostNotesMode.ALL,
-    ): BlogPostNotesResponse {
+    ): BlogPostNotes {
         val api = this.client.get {
             url {
                 appendPathSegments(version, "blog", blog, "notes")
@@ -116,11 +117,18 @@ abstract class BaseClient(
         }
 
         return when (mode) {
-            PostNotesMode.CONVERSATION -> api.body<Response<BlogPostNotesResponseConversation>>()
-            PostNotesMode.REBLOGS_WITH_TAGS -> api.body<Response<BlogPostNotesResponseWithTags>>()
-            else -> api.body<Response<BlogPostNotesResponseNormal>>()
+            PostNotesMode.CONVERSATION -> api.body<Response<BlogPostNotesConversation>>()
+            PostNotesMode.REBLOGS_WITH_TAGS -> api.body<Response<BlogPostNotesWithTags>>()
+            else -> api.body<Response<BlogPostNotesNormal>>()
         }.contents
     }
+
+    suspend fun blogPostNotes(
+        blog: Blog,
+        id: Long,
+        before: Long? = null,
+        mode: PostNotesMode = PostNotesMode.ALL,
+    ) = blogPostNotes(blog.name, id, before, mode)
 
     // * // * // * // * // * // * // * // * // * // * //
 
@@ -154,7 +162,7 @@ abstract class BaseClient(
             parameters.append("limit", limit.toString())
             tags?.forEachIndexed { idx, tag -> parameters.append("tag[$idx]", tag) }
         }
-    }.body<Response<BlogPostsResponse>>().contents.posts
+    }.body<Response<BlogPosts>>().contents.posts
         .let { if (filters.isNotEmpty()) it.filterContent(filterStrict, *filters) else it }
         .let { if (after != null) it.filter { post -> post.timestamp > after }.toSet() else it }
 
@@ -167,8 +175,30 @@ abstract class BaseClient(
         textFilter: PostTextReturnFilter = PostTextReturnFilter.HTML,
         tag: String,
         vararg filters: PostContentType,
-        filterStrict: Boolean = false
+        filterStrict: Boolean = false,
     ) = blogPosts(blog, limit, before, after, offset, textFilter, setOf(tag), *filters, filterStrict = filterStrict)
+
+    suspend fun blogPosts(
+        blog: Blog,
+        limit: Byte = 20,
+        before: Long? = null,
+        after: Long? = null,
+        offset: Int = 0,
+        textFilter: PostTextReturnFilter = PostTextReturnFilter.HTML,
+        tag: String,
+        vararg filters: PostContentType,
+        filterStrict: Boolean = false,
+    ) = blogPosts(
+        blog.name,
+        limit,
+        before,
+        after,
+        offset,
+        textFilter,
+        setOf(tag),
+        *filters,
+        filterStrict = filterStrict
+    )
 
     suspend fun blogPost(
         blog: String,
@@ -181,6 +211,12 @@ abstract class BaseClient(
             parameters.append("id", id.toString())
         }
     }.body<Response<Set<Post>>>().contents.first()
+
+    suspend fun blogPost(
+        blog: Blog,
+        id: Long,
+        textFilter: PostTextReturnFilter = PostTextReturnFilter.HTML,
+    ) = blogPost(blog.name, id, textFilter)
 
     private suspend fun blogLikes(
         blog: String,
@@ -210,24 +246,48 @@ abstract class BaseClient(
         before: Long,
         limit: Byte = 20,
         vararg filters: PostContentType,
-        filterStrict: Boolean = false
+        filterStrict: Boolean = false,
     ) = blogLikes(blog, before, null, null, limit, *filters, filterStrict = filterStrict)
+
+    suspend fun blogLikesBefore(
+        blog: Blog,
+        before: Long,
+        limit: Byte = 20,
+        vararg filters: PostContentType,
+        filterStrict: Boolean = false,
+    ) = blogLikes(blog.name, before, null, null, limit, *filters, filterStrict = filterStrict)
 
     suspend fun blogLikesAfter(
         blog: String,
         after: Long,
         limit: Byte = 20,
         vararg filters: PostContentType,
-        filterStrict: Boolean = false
+        filterStrict: Boolean = false,
     ) = blogLikes(blog, null, null, after, limit, *filters, filterStrict = filterStrict)
+
+    suspend fun blogLikesAfter(
+        blog: Blog,
+        after: Long,
+        limit: Byte = 20,
+        vararg filters: PostContentType,
+        filterStrict: Boolean = false,
+    ) = blogLikes(blog.name, null, null, after, limit, *filters, filterStrict = filterStrict)
 
     suspend fun blogLikes(
         blog: String,
         limit: Byte = 20,
         offset: Int? = null,
         vararg filters: PostContentType,
-        filterStrict: Boolean = false
+        filterStrict: Boolean = false,
     ) = blogLikes(blog, null, offset, null, limit, *filters, filterStrict = filterStrict)
+
+    suspend fun blogLikes(
+        blog: Blog,
+        limit: Byte = 20,
+        offset: Int? = null,
+        vararg filters: PostContentType,
+        filterStrict: Boolean = false,
+    ) = blogLikes(blog.name, limit, offset, *filters, filterStrict = filterStrict)
 
     suspend fun readTag(
         tag: String,
@@ -248,7 +308,6 @@ abstract class BaseClient(
         .let { if (after != null) it.filter { post -> post.timestamp > after }.toSet() else it }
 }
 
-// TODO: class OAuthClient(...) refer to ln 73
 // TODO: handle api errors (probably through a protected function)
 
 expect class Client(consumerKey: String): BaseClient
